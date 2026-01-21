@@ -1,0 +1,131 @@
+HAFIPORTRAIT — PYTHON WORKFLOW (STANDALONE) PRD
+
+1. Overview
+This document defines a standalone Python workflow intended to run on a photographer laptop (Windows + optional WSL). It must NOT depend on the Next.js source code. Integration is via HTTP API only (API key).
+
+2. Goals
+- Provide a reliable 8+ hour workflow for continuous delivery of JPG exports to the Hafiportrait platform.
+- Support two operational modes:
+  A) SIMPLE: watch -> split RAW/JPG -> validate JPG -> upload
+  B) FULL  : watch -> split RAW/JPG -> process JPG (basic preset) -> watermark overlay -> upload
+- Ensure reliability with resume state, dedupe, and safe handling of partially-written files.
+
+3. Target User
+- Photographer/admin running Windows laptop.
+- Optional WSL used for gphoto2 and darktable CLI; Python may run either on Windows or WSL.
+
+4. Inputs
+- Source folder where gphoto2/darktable outputs files (incoming folder).
+- Watermark logo PNG files:
+  - watermark_landscape.png (same canvas size as landscape photos)
+  - watermark_portrait.png  (same canvas size as portrait photos)
+- API base URL (default: https://hafiportrait.photography/api)
+- API key (x-api-key)
+
+5. Folder Structure (fixed)
+- incoming/   : initial drop (from gphoto2/darktable)
+- raw/        : RAW files moved here
+- jpg_in/     : JPG files ready for processing/upload
+- processed/  : output JPG after watermark/preset
+- uploaded/   : successfully uploaded files
+- failed/     : processing/upload failed files
+- tmp/        : temporary files (atomic operations)
+- state/      : state db/json (resume/dedupe)
+- logs/       : logs
+
+6. Event Selection (before running)
+The workflow requires eventId (UUID) for upload endpoint:
+POST /api/admin/events/{eventId}/photos/upload
+
+Two supported ways to obtain eventId:
+- Admin list (requires API key): GET /api/admin/events
+- Public list: GET /api/public/events
+
+CLI must support:
+- Interactive select: list -> choose -> persist to config
+- Non-interactive: --event-id <uuid>
+
+7. SIMPLE Workflow
+Steps:
+1) Watch incoming/
+2) When a new file arrives:
+   - If RAW (e.g., .nef/.cr2/.arw) => move to raw/
+   - If JPG/JPEG => move to jpg_in/
+3) Validate JPG is complete (size stable, readable)
+4) Upload JPG to event upload endpoint
+5) On success: move to uploaded/
+6) On failure: move to failed/ and record reason
+
+8. FULL Workflow
+Steps:
+1) Watch incoming/
+2) Split RAW/JPG (same as SIMPLE)
+3) For JPG:
+   - Apply preset (basic adjustments) if enabled
+   - Apply watermark overlay (full overlay)
+     - choose watermark based on photo orientation
+4) Save result into processed/
+5) Upload processed JPG
+6) Move to uploaded/ or failed/
+
+9. Preset (basic adjustments)
+- Toggle: on/off
+- Minimal viable set (tunable): brightness, contrast, sharpness
+- Implementation can use Pillow or OpenCV.
+
+10. Watermark overlay
+- Full-overlay PNG watermark.
+- Choose watermark_landscape.png vs watermark_portrait.png based on image width/height.
+- Must preserve EXIF if feasible (optional initial, recommended later).
+
+11. Reliability requirements
+- Resume state:
+  - Maintain a state database (sqlite) or JSON file per event.
+  - Store file signature (name + size + mtime; optional checksum).
+  - Ensure re-run does not re-upload already successful items.
+- Dedupe:
+  - Prevent double uploads if darktable rewrites the same filename.
+- Partial-file safety:
+  - Must wait until file size stable for X seconds before processing.
+- Retry policy:
+  - Upload retries with exponential backoff (e.g., 3 retries).
+
+12. CLI specification (high level)
+Commands:
+- events list (admin/public)
+- events select (interactive)
+- run simple --watch
+- run full --watch
+- upload batch (optional)
+
+Core options:
+- --api-base-url
+- --api-key
+- --event-id
+- --mode simple|full
+- --watch-dir
+- --interval / polling
+- --preset on|off
+- --watermark-dir
+- --state-path
+
+13. Non-goals (v1)
+- Client/guest upload
+- RAW processing inside Python (handled by darktable)
+- Complex LUT pipeline (future)
+- UI app (CLI only)
+
+14. Decisions v1 (locked)
+- RAW extensions (case-insensitive): .nef, .cr2, .cr3, .arw, .dng, .rw2
+- JPG/JPEG only for processing & upload: .jpg, .jpeg
+- Watcher method: polling (default poll_seconds=2) + file-stable check before processing
+- Output naming: always create a new processed file (do not overwrite source)
+- Dedupe default: filename + size + mtime; optional checksum mode via flag
+- Retry policy: 3 retries with exponential backoff, then move file to failed/
+
+15. Acceptance criteria
+- Workflow can run for 8 hours without manual restart.
+- Upload continues after network interruptions.
+- No duplicate uploads for unchanged files.
+- Partially-written files are not processed.
+

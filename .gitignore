@@ -1,0 +1,23 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+.venv/
+venv/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs (optional, keep out of git)
+logs/
+
+# Local state (optional)
+state/*.json
+
+# Local config (contains secrets)
+config.json
+
+# folder foto
+foto/

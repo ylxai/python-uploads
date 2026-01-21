@@ -1,0 +1,40 @@
+{
+  "api_base_url": "https://hafiportrait.photography/api",
+  "api_key": "YOUR_API_KEY",
+  "event_id": "EVENT_UUID",
+  "folders": {
+    "incoming": "incoming",
+    "raw": "raw",
+    "jpg_in": "jpg_in",
+    "processed": "processed",
+    "uploaded": "uploaded",
+    "failed": "failed",
+    "tmp": "tmp",
+    "state": "state",
+    "logs": "logs"
+  },
+  "frame": {
+    "enabled": false,
+    "landscape": "bingkai.png",
+    "portrait": null
+  },
+  "watermark": {
+    "enabled": false,
+    "landscape": "watermarks/watermark_landscape.png",
+    "portrait": "watermarks/watermark_portrait.png"
+  },
+  "preset": {
+    "enabled": false,
+    "brightness": 1.0,
+    "contrast": 1.0,
+    "sharpness": 1.0
+  },
+  "watch": {
+    "poll_seconds": 2,
+    "file_stable_seconds": 2
+  },
+  "upload": {
+    "timeout_seconds": 120,
+    "retries": 3
+  }
+}
